@@ -8,7 +8,7 @@ def load_npz(directory):
     data_frames = []
 
     # Загрузка всех .npz файлов в директории
-    for file in os.listdir(directory):
+    for file in sorted(os.listdir(directory)):
         if file.endswith('.npz'):
             data = np.load(os.path.join(directory, file), allow_pickle=True)['data']
             temp_df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol'])

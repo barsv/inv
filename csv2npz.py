@@ -24,12 +24,15 @@ def convert_to_5s_bars(filename, output_filename):
     # Переименование столбцов
     resampled_df.columns = ['open', 'high', 'low', 'close', 'vol']
 
+    # Заполнение пропущенных значений для 'open', 'high', 'low', 'close' методом ffill
+    resampled_df[['open', 'high', 'low', 'close']] = resampled_df[['open', 'high', 'low', 'close']].ffill()
+
+    # Замена возможных NaN в 'vol' на 0
+    resampled_df['vol'].fillna(0, inplace=True)
+    
     # Сброс индекса для преобразования временного индекса обратно в столбец
     resampled_df.reset_index(inplace=True)
 
-    # Замена возможных NaN в 'vol' на 0
-    resampled_df.fillna(0, inplace=True)
-    
     # Сохранение в файл .npz
     np.savez(output_filename, data=resampled_df.values)
     print(f"Файл '{output_filename}' успешно сохранён.")
@@ -41,7 +44,7 @@ def convert_all_csv_in_directory(input_dir, output_dir):
         print(f"Создана директория: {output_dir}")
 
     # Перечисление всех файлов в директории
-    for filename in os.listdir(input_dir):
+    for filename in sorted(os.listdir(input_dir)):
         if filename.endswith('.csv'):
             input_filepath = os.path.join(input_dir, filename)
             output_filename = os.path.join(output_dir, os.path.splitext(filename)[0] + '.npz')
