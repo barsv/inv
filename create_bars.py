@@ -65,6 +65,10 @@ def create_bars(symbol):
     directory = f'npz/{symbol}'
     output_directory = 'npz'
     full_data = load_npz(directory)
+    # 1 minute bars
+    period = '1T'
+    resampled_data = resample_npz(full_data, period)
+    save_resampled_data_to_npz(resampled_data, output_directory, f'{symbol}_{period}.npz')
     # 5 minute bars
     period = '5T'
     resampled_data = resample_npz(full_data, period)
