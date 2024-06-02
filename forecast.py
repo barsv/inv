@@ -50,17 +50,17 @@ headers = {
   "Authorization": f"Bearer {api_key}"
 }
 
-def get_df(symbol, date_time, period, length = 1000):
+def get_df(symbol, date_time, period):
     """
-    Загрузить датафрейм с диска и взять с него слайс.
+    Загрузить датафрейм с диска.
     
     Параметры:
+    symbol: string
+        Например, BTCUSD.
     date_time : string
         Например, 2024-05-29 08:10. Время не обязательно должно попадать в точку графика (будет взята ближайшая точка).
     period : string
         Допустимые значения: '5S' - 5 секунд, '1T' - 1 minute, '5T' - 5 minutes, '1H' - 1 hour, 'D' - 1 day.
-    length : number
-        Сколько точек надо в датафрейме.
     """
     if period == '5S': # пятисекундные свечи
         # '2024-05-29 08:10' -> '2024-05-29'
@@ -81,7 +81,22 @@ def get_df(symbol, date_time, period, length = 1000):
     # Преобразование всех столбцов с ценами и объемом в числовой формат
     for column in ['open', 'high', 'low', 'close', 'volume']:
         df[column] = pd.to_numeric(df[column], errors='coerce')
+    return df
 
+
+def get_df_for_chart(symbol, date_time, period, length = 1000):
+    """
+    Загрузить датафрейм с диска и взять с него слайс.
+    
+    Параметры:
+    date_time : string
+        Например, 2024-05-29 08:10. Время не обязательно должно попадать в точку графика (будет взята ближайшая точка).
+    period : string
+        Допустимые значения: '5S' - 5 секунд, '1T' - 1 minute, '5T' - 5 minutes, '1H' - 1 hour, 'D' - 1 day.
+    length : number
+        Сколько точек надо в датафрейме.
+    """
+    df = get_df(symbol, date_time, period)
     # поиск интересной точки.
     date_to_find = date_to_find = pd.Timestamp(date_time)
     index_position = df.index.get_indexer([date_to_find], method='nearest')[0]
@@ -333,9 +348,15 @@ def append_forecast_to_csv(symbol, charts_at, data, current_time_string):
 
 
 def get_forecast(symbol, charts_at):
+    """
+    Получить прогноз для тикера в заданое время.
+    
+    symbol - например, BTCUSD.
+    charts_at - строка в формате %Y-%m-%d %H:%M например '2024-01-13 01:02'
+    """
     current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f'Reading {chart_period} data for {charts_at}...')
-    df = get_df(symbol, charts_at, chart_period)
+    df = get_df_for_chart(symbol, charts_at, chart_period)
     create_image(df)
     content = get_forecast_from_chart()
     # сохраняем ответ первого запроса к api в целях логирования, чтобы можно было потом при дебаге посмотреть что был за 

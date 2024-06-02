@@ -7,3 +7,4 @@
 /api_responses_2
 /forecasts
 .env
+*.pyc
