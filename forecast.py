@@ -188,9 +188,9 @@ def get_forecast_from_chart():
             {
             "role": "system", 
             "content": "You are a professional quantitative analyst specializing in financial market analysis and price" 
-                    + " forecasting. You always spend a few sentences explaining background context, assumptions, and" 
-                    + " step-by-step thinking BEFORE you try to answer a question to ensure accuracy. You conduct a"
-                    + " thorough analysis of the overall market situation before providing forecasts."
+                + " forecasting. You always spend a few sentences explaining background context, assumptions, and" 
+                + " step-by-step thinking BEFORE you try to answer a question to ensure accuracy. You conduct a"
+                + " thorough analysis of the overall market situation before providing forecasts."
             },
             {
             "role": "user", 
@@ -198,11 +198,11 @@ def get_forecast_from_chart():
                 {
                 "type": "text", 
                 "text": "Could you please analyze the attached minute candlestick chart and provide forecasts for the next"
-                        + " 5 minutes. The main chart includes Bollinger Bands (period=20, color=black), VWAP (color=blue), ATR"
-                        + " (period=10, color=red). The volume chart also includes RSI (period=14, color=black)."
-                        + " Below the volume chart is a panel with MACD (fast=12, slow=26, signal=9). Please MAKE SURE TO"
-                        + " INCLUDE the predicted CLOSING PRICE RANGE after the next 5 minutes as well as the PROBABILITIES of"
-                        + " price increase and decrease."
+                    + " 5 minutes. The main chart includes Bollinger Bands (period=20, color=black), VWAP (color=blue), ATR"
+                    + " (period=10, color=red). The volume chart also includes RSI (period=14, color=black)."
+                    + " Below the volume chart is a panel with MACD (fast=12, slow=26, signal=9). Please MAKE SURE TO"
+                    + " INCLUDE the predicted CLOSING PRICE RANGE after the next 5 minutes as well as the PROBABILITIES of"
+                    + " price increase and decrease and your CONFIDENCE in the forecast as a numerical value on a scale from 1 to 10."
                 },
                 {
                 "type": "image_url",
@@ -235,49 +235,48 @@ def get_forecast_json_string(content):
         "messages": [
             {
             "role": "system", 
-            "content": """You are an LLM assistant specialized in converting financial analysis text into structured JSON format.
-        Your task is to extract key numerical values and probabilities from the provided analysis and format
-        them into a JSON object with the following fields: 'h' for the predicted highest price, 'l' for the
-        predicted lowest price, 'p_up' for the probability of price increase, 'p_down' for the probability
-        of price decrease, and 'error' for any potential issues or discrepancies noted during extraction.
-        Ensure the JSON output accurately reflects the information in the analysis, adheres to the following
-        JSON Schema:
-
-        ```
-        {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-            "h": {
-            "type": "number",
-            "description": "Predicted highest price"
-            },
-            "l": {
-            "type": "number",
-            "description": "Predicted lowest price"
-            },
-            "p_up": {
-            "type": "number",
-            "description": "Probability of price increase",
-            "minimum": 0,
-            "maximum": 100
-            },
-            "p_down": {
-            "type": "number",
-            "description": "Probability of price decrease",
-            "minimum": 0,
-            "maximum": 100
-            },
-            "error": {
-            "type": "string",
-            "description": "Error message if any issue is found"
-            }
-        },
-        "additionalProperties": false
-        }
-        ```
-
-        Respond only in JSON format without any additional text, as your response will be processed automatically by a program."""
+            "content": """You are an LLM assistant specialized in converting financial analysis text into structured JSON format. 
+Your task is to extract key numerical values and probabilities from the provided analysis and format 
+them into a JSON object with the following fields: 'h' for the predicted highest price, 'l' for the 
+predicted lowest price, 'p_up' for the probability of price increase, 'p_down' for the probability 
+of price decrease, 'conf' for the confidence in the forecast, and 'error' for any potential issues or 
+discrepancies noted during extraction. 
+Ensure the JSON output accurately reflects the information in the analysis, adheres to the following 
+JSON Schema:
+```
+{
+"$schema": "http://json-schema.org/draft-07/schema#",
+"type": "object",
+"properties": {
+    "h": {
+    "type": "number",
+    },
+    "l": {
+    "type": "number",
+    },
+    "p_up": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100
+    },
+    "p_down": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100
+    },
+    "conf": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10
+    },
+    "error": {
+    "type": "string",
+    }
+},
+"additionalProperties": false
+}
+```
+Respond only in JSON format without any additional text, as your response will be processed automatically by a program."""
             },
             {
             "role": "user", 
@@ -300,7 +299,7 @@ def get_forecast_json_string(content):
     return json_string
 
 
-def append_forecast_to_csv(symbol, charts_at, data):
+def append_forecast_to_csv(symbol, charts_at, data, current_time_string):
     forecasts_dir = 'forecasts/'
     os.makedirs(forecasts_dir, exist_ok=True)
     # Имя вашего CSV файла
@@ -315,17 +314,26 @@ def append_forecast_to_csv(symbol, charts_at, data):
         
         # Если файл не существует, пишем заголовок
         if not file_exists:
-            header = ['time', 'high', 'low', 'p_up', 'p_down', 'error', 'created_at']  # Укажите ваши заголовки
+            header = [
+                'last_candle_time',
+                'high',
+                'low',
+                'p_up',
+                'p_down',
+                'conf',
+                'created_at',
+                'error',
+            ]
             writer.writerow(header)
         
-        forecast = (charts_at, data["h"], data['l'], data['p_up'], data['p_down'], data['error'], )
+        forecast = (charts_at, data["h"], data['l'], data['p_up'], data['p_down'], data['conf'], current_time_string, data['error'])
         # Добавляем кортеж как новую строку
         writer.writerow(forecast)
     print(f"Прогноз успешно добавлен в файл {filename}")
 
 
 def get_forecast(symbol, charts_at):
-    current_time = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f'Reading {chart_period} data for {charts_at}...')
     df = get_df(symbol, charts_at, chart_period)
     create_image(df)
@@ -342,10 +350,12 @@ def get_forecast(symbol, charts_at):
     data = json.loads(json_string)
 
     print('Forecast:')
-    print('time \t', 'high \t', 'low \t', 'p_up \t', 'p_down \t', 'error \t')
-    print(charts_at, ' \t', data["h"], ' \t', data['l'], ' \t', data['p_up'], ' \t', data['p_down'], ' \t', data['error'], current_time)
+    print('time                     high            low             p_up    p_down  conf     created_at           error')
+   #print('2024-05-29 08:35         67850           67750           55      45      5        2024-06-02-14-04-20')
+    print(charts_at, ' \t', data["h"], ' \t', data['l'], ' \t', data['p_up'], ' \t', data['p_down'], ' \t', 
+          data['conf'], ' \t', data['error'], current_time)
 
-    append_forecast_to_csv(symbol, charts_at, data)
+    append_forecast_to_csv(symbol, charts_at, data, current_time)
     return data
 
 if __name__ == "__main__":
