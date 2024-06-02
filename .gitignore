@@ -2,4 +2,8 @@
 /npz
 /venv
 /img
+/api_responses_1
+/api_responses_1_md
+/api_responses_2
+/forecasts
 .env
