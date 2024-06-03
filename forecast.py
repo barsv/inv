@@ -217,7 +217,8 @@ def get_forecast_from_chart():
                     + " (period=10, color=red). The volume chart also includes RSI (period=14, color=black)."
                     + " Below the volume chart is a panel with MACD (fast=12, slow=26, signal=9). Please MAKE SURE TO"
                     + " INCLUDE the predicted CLOSING PRICE RANGE after the next 5 minutes as well as the PROBABILITIES of"
-                    + " price increase and decrease and your CONFIDENCE in the forecast as a numerical value on a scale from 1 to 10."
+                    + " price increase and decrease and your CONFIDENCE in the forecast of the price increase"
+                    + " and decrease as a numerical value on a scale from 1 to 10."
                 },
                 {
                 "type": "image_url",
