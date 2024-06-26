@@ -277,6 +277,18 @@ def create_chart_app(create_figure_func, on_period_change):
         };
 
         const firstPaneSvg = graphDiv.getElementsByClassName('bglayer')[0].getElementsByClassName('bg')[0];
+            
+        const xValuesMap = {};
+        const getXValues = (trace) => {
+            const key = `${trace.name}-${trace.yaxis}`;
+            const existingValue = xValuesMap[key];
+            if (existingValue) {
+                return existingValue;
+            }
+            const xValues = trace.x.map(x => new Date(Date.parse(convertToUTC(x))));
+            xValuesMap[key] = xValues;
+            return xValues;
+        };
 
         const updateCursorLines = () => {
             // Get the plot's size and position
@@ -298,23 +310,32 @@ def create_chart_app(create_figure_func, on_period_change):
             // Prepare output data
             let output = `Time: ${convertToStr(xData)} `;
 
-            graphDiv.data.forEach(trace => {
+            // Функция для обработки trace и добавления его в output
+            function processTrace(trace) {
                 if (trace.x) {
-                    const xValues = trace.x.map(x => new Date(Date.parse(convertToUTC(x))));
+                    const xValues = getXValues(trace);
                     const index = xValues.findIndex(xVal => xVal >= xData);
                     if (index !== -1) {
-                        if (trace.y) {
-                            output += `${trace.name || ''}: ${trace.y[index]}<br>`;
-                        } else if (trace.high && trace.low && trace.open && trace.close) {
+                        if (trace.high && trace.low && trace.open && trace.close) {
                             output += ` O${trace.open[index]} H${trace.high[index]}`
-                                    + ` L${trace.low[index]} C${trace.close[index]} `
-                                    //+ ` xData${xData} yData${yData}<br>`
-                                    //+ ` mX${window.mouseX} mY${window.mouseY}<br>`
-                                    //+ ` xRange[0]${xRange[0]} xRange[1]${xRange[1]}<br>`
-                                    //+ ` w${plotWidth} h${plotHeight}<br>`
-                                    ;
+                                    + ` L${trace.low[index]} C${trace.close[index]} `;
+                        } else if (trace.y) {
+                            output += `${trace.name || ''}: ${trace.y[index]}<br>`;
                         }
                     }
+                }
+            }
+
+            // Сначала обрабатываем OHLC trace
+            graphDiv.data.find(trace => trace.high && trace.low && trace.open && trace.close && processTrace(trace));
+
+            // Затем обрабатываем Volume trace
+            graphDiv.data.find(trace => trace.name === 'Volume' && processTrace(trace));
+
+            // Наконец, обрабатываем все остальные traces
+            graphDiv.data.forEach(trace => {
+                if (!(trace.high && trace.low && trace.open && trace.close) && trace.name !== 'Volume') {
+                    processTrace(trace);
                 }
             });
 
@@ -337,6 +358,7 @@ def create_chart_app(create_figure_func, on_period_change):
                 }
             ];
         };
+
 
         graphDiv.onmousemove = function(event) {
             console.log('onmousemove started');
