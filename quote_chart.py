@@ -239,7 +239,7 @@ def create_chart_app(create_figure_func, on_period_change):
             // Compute new y range based on new x range
             const firstPaneRanges = graphDiv.data.filter(d => d.yaxis === 'y'); // not y2, y3, etc.
             const newYRanges = firstPaneRanges.map(trace => {
-                const xValues = trace.x.map(x => new Date(Date.parse(convertToUTC(x))));
+                const xValues = getXValues(trace);
                 let yMin, yMax;
                 if (trace.y) {
                     const yValues = trace.y;
@@ -276,7 +276,8 @@ def create_chart_app(create_figure_func, on_period_change):
             console.log('onwheel completed');
         };
 
-        const firstPaneSvg = graphDiv.getElementsByClassName('bglayer')[0].getElementsByClassName('bg')[0];
+        const bglayer = graphDiv.getElementsByClassName('bglayer')[0];
+        const firstPaneSvg = bglayer.getElementsByClassName('bg')[0];
             
         const xValuesMap = {};
         const getXValues = (trace) => {
@@ -290,8 +291,39 @@ def create_chart_app(create_figure_func, on_period_change):
             return xValues;
         };
 
+        function findNearestIndex(xValues, xData) {
+            let left = 0;
+            let right = xValues.length - 1;
+
+            // Проверка краевых случаев
+            if (xData <= xValues[left]) return left;
+            if (xData >= xValues[right]) return right;
+
+            while (left <= right) {
+                let mid = Math.floor((left + right) / 2);
+
+                if (xValues[mid] === xData) {
+                    return mid; // Точное совпадение
+                } else if (xValues[mid] < xData) {
+                    left = mid + 1;
+                } else {
+                    right = mid - 1;
+                }
+            }
+
+            // После выхода из цикла, left будет указывать на первый элемент, который больше xData
+            // Сравниваем расстояние между xData и соседними точками
+            if (left === 0) return 0;
+            if (left === xValues.length) return xValues.length - 1;
+
+            const leftDiff = Math.abs(xValues[left - 1] - xData);
+            const rightDiff = Math.abs(xValues[left] - xData);
+
+            return leftDiff <= rightDiff ? left - 1 : left;
+        }
+
         const updateCursorLines = () => {
-            // Get the plot's size and position
+            // Get the plot's size and position.
             const plotWidth = firstPaneSvg.width.baseVal.value;
             const plotHeight = firstPaneSvg.height.baseVal.value;
 
@@ -299,43 +331,47 @@ def create_chart_app(create_figure_func, on_period_change):
             const xRange = graphDiv.layout.xaxis.range.map(x => new Date(convertToUTC(x)));
             const yRange = graphDiv.layout.yaxis.range;
 
+            const graphRect = graphDiv.getBoundingClientRect();
+            const bgRect = bglayer.getBoundingClientRect();
+            const left = bgRect.x - graphRect.x;
+            const top = bgRect.y - graphRect.y;
+            const relativeX = window.mouseX - left;
+            const relativeY = window.mouseY - top;
 
-            //const xData = new Date(xRange[0].getTime() + (window.mouseX / plotWidth) * (xRange[1] - xRange[0]));
-            //const yData = yRange[0] + (1 - (window.mouseY / plotHeight)) * (yRange[1] - yRange[0]);
-            const margin = graphDiv.layout.margin || { l: 0, r: 0, t: 0, b: 0 };
+            const xData = new Date(xRange[0].getTime() + (relativeX / plotWidth) * (xRange[1] - xRange[0]));
+            const yData = yRange[0] + ((plotHeight - relativeY) / plotHeight) * (yRange[1] - yRange[0]);
 
-            const xData = new Date(xRange[0].getTime() + ((window.mouseX - margin.l) / plotWidth) * (xRange[1] - xRange[0]));
-            const yData = yRange[0] + ((plotHeight - (window.mouseY - margin.t)) / plotHeight) * (yRange[1] - yRange[0]);
+            // find OHLC trace
+            const ohlc = graphDiv.data.find(trace => trace.high);
+            // find Volume trace
+            const volume = graphDiv.data.find(trace => trace.name === 'Volume');
 
-            // Prepare output data
-            let output = `Time: ${convertToStr(xData)} `;
-
-            // Функция для обработки trace и добавления его в output
-            function processTrace(trace) {
-                if (trace.x) {
-                    const xValues = getXValues(trace);
-                    const index = xValues.findIndex(xVal => xVal >= xData);
-                    if (index !== -1) {
-                        if (trace.high && trace.low && trace.open && trace.close) {
-                            output += ` O${trace.open[index]} H${trace.high[index]}`
-                                    + ` L${trace.low[index]} C${trace.close[index]} `;
-                        } else if (trace.y) {
-                            output += `${trace.name || ''}: ${trace.y[index]}<br>`;
-                        }
-                    }
-                }
+            let xValues = getXValues(ohlc);
+            let index = findNearestIndex(xValues, xData);
+            if (index === -1) {
+                return;
             }
+            let output = '<div>'
+                + ` T${convertToStr(xData)}`
+                + ` O${ohlc.open[index]} H${ohlc.high[index]}`
+                + ` L${ohlc.low[index]} C${ohlc.close[index]}`
+                + ` V${volume.y[index]}`
+                + `<br>xData${xData.toISOString()} yData${yData}<br>`
+                + `mX${window.mouseX} mY${window.mouseY}<br>`
+                + `relativeX${relativeX} relativeY${relativeY} <br>`
+                + `xRange[0]${xRange[0].toISOString()} xRange[1]${xRange[1].toISOString()}<br>`
+                + `w${plotWidth} h${plotHeight}<br>`
+                + '</div>';
 
-            // Сначала обрабатываем OHLC trace
-            graphDiv.data.find(trace => trace.high && trace.low && trace.open && trace.close && processTrace(trace));
-
-            // Затем обрабатываем Volume trace
-            graphDiv.data.find(trace => trace.name === 'Volume' && processTrace(trace));
-
-            // Наконец, обрабатываем все остальные traces
+            // Add info from other non ohlc/volume traces.
             graphDiv.data.forEach(trace => {
                 if (!(trace.high && trace.low && trace.open && trace.close) && trace.name !== 'Volume') {
-                    processTrace(trace);
+                    xValues = getXValues(ohlc);
+                    index = findNearestIndex(xValues, xData);
+                    if (index === -1) {
+                        return;
+                    }
+                    output += `<div>${trace.name || ''}: ${trace.y[index]}</div>`;
                 }
             });
 
