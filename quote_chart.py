@@ -37,9 +37,11 @@ def create_chart_app(create_figure_func, on_period_change=None, period_buttons=N
         if not period_buttons:
             period_buttons = [
                 # buttons to change period of candles.
-                html.Button('1m', id='1T'),
-                html.Button('5m', id='5T'),
-                html.Button('1h', id='1H'),
+                html.Button('1m', id='1min'),
+                html.Button('5m', id='5min'),
+                html.Button('15m', id='15min'),
+                html.Button('1h', id='1h'),
+                html.Button('4h', id='4h'),
                 html.Button('D', id='D'),
             ]
         layout_items += period_buttons
@@ -395,7 +397,18 @@ def create_chart_app(create_figure_func, on_period_change=None, period_buttons=N
                 });
 
                 // Update the hover-output div
-                hoverOutput.innerHTML = output;
+                const style = `
+                    width: 0;
+                    font-family: 'Open Sans', verdana, arial, sans-serif; 
+                    font-size: 12px; 
+                    fill: rgb(42, 63, 95);
+                    fill-opacity: 1;
+                    font-weight: normal;
+                    font-style: normal; 
+                    font-variant: normal;
+                    white-space: pre;
+                `;
+                hoverOutput.innerHTML = `<div style="${style}">${output}</div>`;
 
                 // Add cursor lines
                 window.cursorLines = [
