@@ -2,17 +2,18 @@ from dash import Dash, dcc, html, Input, Output, callback, clientside_callback, 
 import dash
 from datetime import datetime
 
-def create_chart_app(create_figure_func, on_period_change=None, debug=False):
+def create_chart_app(create_figure_func, on_period_change=None, period_buttons=None, debug=False):
     """
     Create a Dash chart application with given figure creation function and optional period change handler.
 
     Parameters:
     create_figure_func (function): Function to create the figure for the chart.
     on_period_change (function, optional): Function to handle period change events. Default is None.
+    period_buttons (array, optional): Buttons to change candles period. Default is None.
     debug (bool, optional): Flag to enable or disable debug logging. Default is False.
     """
     app = Dash(__name__)
-    app.layout = html.Div([
+    layout_items = [
         html.Div([
             dcc.Graph(id='basic-interactions'),
             html.Div(id='hover-output', style={
@@ -28,14 +29,22 @@ def create_chart_app(create_figure_func, on_period_change=None, debug=False):
         # hidden input to pass events from client side javascript to the server.
         # see: https://gist.github.com/barsv/8691d92498b313748576a733d0ad1c3d
         dcc.Input(type='text', id='hidden-input', value='', style={'display': 'none'}),
-        # buttons to change period of candles.
-        html.Button('1m', id='one-min'),
-        html.Button('5m', id='five-min'),
-        html.Button('1h', id='one-hour'),
-        html.Button('D', id='one-day'),
         # div for script that handles scroll events for the chart.
         html.Div(id='script-output')
-    ])
+    ]
+    period_buttons_callback_inputs = []
+    if on_period_change:
+        if not period_buttons:
+            period_buttons = [
+                # buttons to change period of candles.
+                html.Button('1m', id='1T'),
+                html.Button('5m', id='5T'),
+                html.Button('1h', id='1H'),
+                html.Button('D', id='D'),
+            ]
+        layout_items += period_buttons
+        period_buttons_callback_inputs = [Input(b.id, 'n_clicks') for b in period_buttons]
+    app.layout = html.Div(layout_items)
 
 
     # This callback listens for events from client-side javascript. Currently client side js notifies server if a scrolling
@@ -100,18 +109,17 @@ def create_chart_app(create_figure_func, on_period_change=None, debug=False):
             print(f"relayout_store: {relayout_store}")
         return relayout_store
 
+
     @callback(
         Output('basic-interactions', 'figure'),
         Input('relayout-store', 'data'),
         Input('scrolling-store', 'data'),
-        Input('one-min', 'n_clicks'),
-        Input('five-min', 'n_clicks'),
-        Input('one-hour', 'n_clicks'),
-        Input('one-day', 'n_clicks'),
         # state is needed because this callback can be triggered not only by scrolling-store state changes but the state 
         # of scrolling is needed always for example if the user does pan.
-        State('scrolling-store', 'data')) 
-    def update_graph(relayout_store, scrolling_store, one_min, f_min, hour, day, scrolling_store_state):
+        State('scrolling-store', 'data'),
+        period_buttons_callback_inputs,
+        ) 
+    def update_graph(relayout_store, scrolling_store, scrolling_store_state, *args):
         """Update graph based on relayout store, scrolling store, and button clicks."""
         if debug:
             print('update_graph started')
@@ -123,10 +131,11 @@ def create_chart_app(create_figure_func, on_period_change=None, debug=False):
             return dash.no_update
         global candles_df, selected_period
         # check if this callback was triggered by a button press. if it was then set the period of candles.
-        ctx = callback_context
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else 'no clicks yet'
         if on_period_change:
-            on_period_change(button_id)
+            ctx = callback_context
+            button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else ''
+            if button_id not in ['scrolling-store', 'relayout-store', 'scrolling-store-state']:
+                on_period_change(button_id)
         x0 = None
         x1 = None
         # slice dataframe so that there will be enough data to plot the chart and also have data on the left and right so 
@@ -149,6 +158,7 @@ def create_chart_app(create_figure_func, on_period_change=None, debug=False):
             if 'dragmode' in relayout_store:
                 fig.update_layout(dragmode=relayout_store['dragmode'])
         return fig
+
 
     clientside_callback(
         """
@@ -449,6 +459,7 @@ def create_chart_app(create_figure_func, on_period_change=None, debug=False):
     )
 
     return app
+
 
 # when server side code gets notified by client side js about current zoom/pan state for x axe it gets date time value
 # in different formats. for example, if the range starts at the beginning of the day then the value doesn't have hours,
