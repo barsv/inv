@@ -247,7 +247,7 @@ def create_chart_app(create_figure_func, on_period_change=None, period_buttons=N
                     newX1 = convertToStr(newX1date);
                 } else if (event.shiftKey) {
                     // Horizontal scroll
-                    const scrollDelta = -1 * (xrange[1] - xrange[0]) * 0.05 * zoom;
+                    const scrollDelta = 1 * (xrange[1] - xrange[0]) * 0.05 * zoom;
                     newX0date = new Date(xrange[0].getTime() + scrollDelta);
                     newX0 = convertToStr(newX0date);
                     newX1date = new Date(xrange[1].getTime() + scrollDelta);
