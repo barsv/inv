@@ -169,8 +169,13 @@ def create_chart_app(create_figure_func, on_period_change=None, period_buttons=N
                 console.log('loading client side script');
             }
 
-        // Convert date string to UTC
-            const convertToUTC = dateStr => dateStr.length === 10 ? `${dateStr}T00:00:00Z` : dateStr.split(' ').join('T') + 'Z';
+            // Convert date string to UTC
+            const convertToUTC = dateStr => {
+                if (typeof(dateStr) === 'number') {
+                    dateStr = `${dateStr}-01-01`;
+                }
+                return dateStr.length === 10 ? `${dateStr}T00:00:00Z` : dateStr.split(' ').join('T') + 'Z';
+            };
             const convertToStr = date => date.toISOString().split('T').join(' ').replace('Z', '');
 
             const notifyServer = (msg) => {
@@ -488,6 +493,8 @@ def parse_date_by_length(date_string):
     datetime: Parsed datetime object.
     """
     # Check the length of the date string and determine the format
+    if isinstance(date_string, int):
+        return datetime(date_string, 1, 1)
     date_length = len(date_string)
     if date_length < 11:
         # Date only (10 characters)
