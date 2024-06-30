@@ -8,3 +8,4 @@
 /forecasts
 .env
 *.pyc
+.vscode/settings.json
