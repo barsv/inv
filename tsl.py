@@ -1,6 +1,4 @@
-trailing_stop_loss_percent = 0.1 * 0.01
-
-def get_trailing_stop_loss_long_profits(df):
+def get_trailing_stop_loss_long_profits(df, trailing_stop_loss_percent = 0.15 * 0.01):
     opens = df['open'].to_numpy()
     highs = df['high'].to_numpy()
     lows = df['low'].to_numpy()
