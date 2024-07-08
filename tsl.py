@@ -1,7 +1,18 @@
+import pandas_ta as ta
+import pandas as pd
+
 def get_trailing_stop_loss_long_profits(df, trailing_stop_loss_percent = 0.15 * 0.01):
     opens = df['open'].to_numpy()
     highs = df['high'].to_numpy()
     lows = df['low'].to_numpy()
+    # volatility = (df['high'] - df['low'])
+    # volatility_ema2 = ta.sma(df['low'], 60)
+    # volatility_ema2.bfill(inplace=True)
+    # volatility_ema2 = volatility_ema2.to_numpy()
+    # volatility_ema20 = ta.ema(volatility, 20)
+    # volatility_ema20.bfill(inplace=True)
+    # volatility_ema20 = volatility_ema20.to_numpy()
+    # volatility_multiplier = 1 + volatility_ema2 / volatility_ema20
     n = len(opens)
     profits = []
     stop_loss_prices = []
@@ -10,7 +21,7 @@ def get_trailing_stop_loss_long_profits(df, trailing_stop_loss_percent = 0.15 * 
     while x0 < n:
         max_high_x = x0
         max_high = highs[x0]
-        sl_size = max_high * trailing_stop_loss_percent
+        sl_size = trailing_stop_loss_percent * max_high # -  volatility_ema2[x0])
         sl_price = max_high - sl_size
         local_stop_loss_prices = [sl_price]
         local_maximums = [max_high]
@@ -29,8 +40,8 @@ def get_trailing_stop_loss_long_profits(df, trailing_stop_loss_percent = 0.15 * 
             if max_high < highs[x]:
                 max_high = highs[x]
                 max_high_x = x
-                sl_size = max_high * trailing_stop_loss_percent
-                sl_price = max_high - sl_size
+            sl_size = trailing_stop_loss_percent * max_high # -  volatility_ema2[x])
+            sl_price = max_high - sl_size
             local_stop_loss_prices.append(sl_price)
             local_maximums.append(max_high)
             x += 1
