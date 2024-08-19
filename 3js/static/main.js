@@ -15,6 +15,7 @@ controls.enableDamping = true; // Для плавного движения
 controls.dampingFactor = 0.05;
 
 camera.position.set(0, 0, 50);
+controls.target.set(0, 0, 0); // Устанавливаем начальную точку вращения
 controls.update();
 
 // Обработчики для передвижения камеры
@@ -97,6 +98,9 @@ function updateMovement() {
     controls.object.position.add(velocity);
     controls.target.add(velocity);
 
+    // Обновляем положение куба на точке вращения камеры
+    cube.position.copy(controls.target);
+
     // Затухание скорости для плавного остановки
     velocity.multiplyScalar(0.9);
 }
@@ -104,6 +108,13 @@ function updateMovement() {
 // Добавление осей координат
 var axesHelper = new THREE.AxesHelper(10);
 scene.add(axesHelper);
+
+// Добавление куба из ребер в точке вращения камеры
+var cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+var edges = new THREE.EdgesGeometry(cubeGeometry); // Создаем геометрию ребер
+var lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 }); // Материал для линий
+var cube = new THREE.LineSegments(edges, lineMaterial); // Создаем линию на основе ребер
+scene.add(cube);
 
 // Функция для построения графика
 function buildChart(data) {
