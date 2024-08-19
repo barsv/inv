@@ -14,7 +14,7 @@ var controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; // Для плавного движения
 controls.dampingFactor = 0.05;
 
-camera.position.set(0, 0, 50);
+camera.position.set(0, 0, 5);
 controls.target.set(0, 0, 0); // Устанавливаем начальную точку вращения
 controls.update();
 
@@ -150,9 +150,10 @@ function buildChart(data) {
 
     // Добавление точек на график
     for (let i = 0; i < closePrices.length; i++) {
-        var z = i * 0.01;
-        var y = (volumes[i] - volumes[0]) / volumeDelta; // Масштабируем объемы для удобства визуализации
         var x = (closePrices[i] - closePrices[0]) / closeDelta;
+        // var y = (volumes[i] - volumes[0]) / volumeDelta; // Масштабируем объемы для удобства визуализации
+        var y = 0; // Масштабируем объемы для удобства визуализации
+        var z = i * 0.01;
 
         vertices.push(x, y, z);
 
@@ -171,14 +172,14 @@ function buildChart(data) {
     var line = new THREE.LineSegments(geometry, lineMaterial);
     scene.add(line);
 
-    // // Построение объемных баров
-    // for (let i = 0; i < volumes.length; i++) {
-    //     var barGeometry = new THREE.BoxGeometry(0.8, 2*volumes[i] / 1007238, 0.8);
-    //     var barMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    //     var bar = new THREE.Mesh(barGeometry, barMaterial);
-    //     bar.position.set(i, volumes[i] / 1007238, 2 * (closePrices[i] - closeMin) / closeDelta); // Коррекция позиции
-    //     scene.add(bar);
-    // }
+    // построение объемных баров
+    for (let i = 0; i < volumes.length; i++) {
+        var bargeometry = new THREE.BoxGeometry(0.02, (volumes[i] - volumes[0]) / volumeDelta, 0.02);
+        var barmaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        var bar = new THREE.Mesh(bargeometry, barmaterial);
+        bar.position.set((closePrices[i] - closePrices[0]) / closeDelta, (volumes[i] - volumes[0]) / volumeDelta / 2, i * 0.01); // коррекция позиции
+        scene.add(bar);
+    }
 }
 
 var animate = function () {
