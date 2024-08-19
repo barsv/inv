@@ -116,10 +116,33 @@ var lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 }); // Мате
 var cube = new THREE.LineSegments(edges, lineMaterial); // Создаем линию на основе ребер
 scene.add(cube);
 
+function findMinMax(arr) {
+    // Инициализация переменных для хранения минимального и максимального значений
+    let min = Infinity;
+    let max = -Infinity;
+
+    // Проход по массиву для нахождения минимального и максимального значений
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i] < min) {
+            min = arr[i];
+        }
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+
+    // Возвращаем объект с минимальным и максимальным значениями
+    return { min, max };
+}
+
 // Функция для построения графика
 function buildChart(data) {
     var closePrices = data.close;
     var volumes = data.vol;
+    var { min: closeMin, max: closeMax } = findMinMax(closePrices);
+    var { min: volumeMin, max: volumeMax } = findMinMax(volumes);
+    var closeDelta = closeMax - closeMin;
+    var volumeDelta = volumeMax - volumeMin;
 
     // Создаем массивы для вершин и индексов
     var vertices = [];
@@ -127,9 +150,9 @@ function buildChart(data) {
 
     // Добавление точек на график
     for (let i = 0; i < closePrices.length; i++) {
-        var x = i;
-        var y = 2 * closePrices[i] / 29257.5;
-        var z = 2 * volumes[i] / 1007238; // Масштабируем объемы для удобства визуализации
+        var z = i * 0.01;
+        var y = (volumes[i] - volumes[0]) / volumeDelta; // Масштабируем объемы для удобства визуализации
+        var x = (closePrices[i] - closePrices[0]) / closeDelta;
 
         vertices.push(x, y, z);
 
@@ -148,14 +171,14 @@ function buildChart(data) {
     var line = new THREE.LineSegments(geometry, lineMaterial);
     scene.add(line);
 
-    // Построение объемных баров
-    for (let i = 0; i < volumes.length; i++) {
-        var barGeometry = new THREE.BoxGeometry(0.8, 0.8, volumes[i] / 10000);
-        var barMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-        var bar = new THREE.Mesh(barGeometry, barMaterial);
-        bar.position.set(i, closePrices[i], volumes[i] / 20000); // Коррекция позиции
-        scene.add(bar);
-    }
+    // // Построение объемных баров
+    // for (let i = 0; i < volumes.length; i++) {
+    //     var barGeometry = new THREE.BoxGeometry(0.8, 2*volumes[i] / 1007238, 0.8);
+    //     var barMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+    //     var bar = new THREE.Mesh(barGeometry, barMaterial);
+    //     bar.position.set(i, volumes[i] / 1007238, 2 * (closePrices[i] - closeMin) / closeDelta); // Коррекция позиции
+    //     scene.add(bar);
+    // }
 }
 
 var animate = function () {
