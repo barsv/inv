@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-
 var canvasContainer = document.getElementById('canvas-container');
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera(75, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
@@ -102,10 +101,9 @@ function updateMovement() {
     velocity.multiplyScalar(0.9);
 }
 
-var geometry = new THREE.BoxGeometry();
-var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-var cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
+// Добавление осей координат
+var axesHelper = new THREE.AxesHelper(10);
+scene.add(axesHelper);
 
 // Функция для построения графика
 function buildChart(data) {
@@ -119,7 +117,7 @@ function buildChart(data) {
     // Добавление точек на график
     for (let i = 0; i < closePrices.length; i++) {
         var x = i;
-        var y = 2* closePrices[i] / 29257.5;
+        var y = 2 * closePrices[i] / 29257.5;
         var z = 2 * volumes[i] / 1007238; // Масштабируем объемы для удобства визуализации
 
         vertices.push(x, y, z);
