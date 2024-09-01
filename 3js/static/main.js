@@ -135,6 +135,7 @@ function findMinMax(arr) {
     return { min, max };
 }
 
+const ySize = 10;
 // Функция для построения графика
 function buildChart(data) {
     var closePrices = data.close;
@@ -150,7 +151,7 @@ function buildChart(data) {
 
     // Добавление точек на график
     for (let i = 0; i < closePrices.length; i++) {
-        var x = (closePrices[i] - closePrices[0]) / closeDelta;
+        var x = ySize * (closePrices[i] - closePrices[0]) / closeDelta;
         // var y = (volumes[i] - volumes[0]) / volumeDelta; // Масштабируем объемы для удобства визуализации
         var y = 0; // Масштабируем объемы для удобства визуализации
         var z = i * 0.01;
@@ -175,9 +176,14 @@ function buildChart(data) {
     // построение объемных баров
     for (let i = 0; i < volumes.length; i++) {
         var bargeometry = new THREE.BoxGeometry(0.02, (volumes[i] - volumes[0]) / volumeDelta, 0.02);
-        var barmaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        var color = i > 0 && closePrices[i] > closePrices[i - 1] ? 0x00ff00 : 0xff0000;
+        var barmaterial = new THREE.MeshBasicMaterial({ color });
         var bar = new THREE.Mesh(bargeometry, barmaterial);
-        bar.position.set((closePrices[i] - closePrices[0]) / closeDelta, (volumes[i] - volumes[0]) / volumeDelta / 2, i * 0.01); // коррекция позиции
+        bar.position.set(
+            ySize * (closePrices[i] - closePrices[0]) / closeDelta,
+            (volumes[i] - volumes[0]) / volumeDelta / 2,
+            i * 0.01
+        ); // коррекция позиции
         scene.add(bar);
     }
 }
