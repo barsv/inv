@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Осциллограф</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="oscilloscope" width="500" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('oscilloscope');
+        const ctx = canvas.getContext('2d');
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Матрица для хранения количества посещений
+        const visitMatrix = Array.from({ length: height }, () =>
+            new Array(width).fill(0)
+        );
+
+        // Параметры точки
+        let x = Math.floor(width / 2); // Начальная позиция по x
+        let y = Math.floor(height / 2); // Начальная позиция по y
+        let t = 0; // Время для движения
+
+        function movePoint() {
+            // Пример движения по синусоиде
+            x = Math.floor((Math.sin(t) + 1) * (width - 1) / 2);
+            y = Math.floor((Math.cos(t) + 1) * (height - 1) / 2);
+            t += 0.0513; // Скорость движения
+        }
+
+        function drawPoint() {
+            // Инкремент количества посещений точки
+            visitMatrix[y][x]++;
+
+            // Определяем интенсивность цвета (например, по логарифмической шкале)
+            const intensity = Math.min(255, Math.log(visitMatrix[y][x] + 1) * 50);
+
+            ctx.fillStyle = `rgb(${intensity}, 0, ${255 - intensity})`;
+            ctx.fillRect(x, y, 1, 1); // Рисуем точку размером 1x1 пиксель
+        }
+
+        function animate() {
+            movePoint();
+            drawPoint();
+            requestAnimationFrame(animate);
+        }
+
+        // Старт анимации
+        animate();
+    </script>
+</body>
+
+</html>
