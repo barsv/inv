@@ -38,3 +38,10 @@ Rauch-Tung-Striebel (RTS) smoother – это алгоритм, расширяю
 исходная статья авторов https://arxiv.org/pdf/2402.11463
 
 hippo с объяснением про ортогональные функции в апендиксе https://arxiv.org/pdf/2008.07669
+
+
+# SINDy
+
+[Brunton, Proctor, Kutz. 2015] Discovering governing equations from data: Sparse identification of nonlinear dynamical systems
+https://arxiv.org/pdf/1509.03580
+
