@@ -9,3 +9,5 @@
 .env
 *.pyc
 .vscode/settings.json
+/attractors/data/*
+/attractors/results/*
