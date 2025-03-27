@@ -131,8 +131,8 @@ def test(_transitions_map, _windows, _grid_sizes, _diff_mins, _diff_maxs, _trans
 @app.function(image=image, timeout=260, scaledown_window=9)
 def evaluate_hyperparams(_tau):
     tau = _tau
-    windows = [60, 120, 240, 480, 960]
-    grid_sizes = [43, 59, 59, 29, 29]
+    windows = [4, 12, 36, 108, 324, 972]
+    grid_sizes = [43, 159, 159, 159, 129, 129]
     transitions_grid_size=2999
     diff_mins, diff_maxs, transitions_map, transitions_min, transitions_max = \
         get_transitions_map(dfc, windows, tau, grid_sizes, transitions_grid_size)
@@ -153,8 +153,7 @@ def evaluate_hyperparams(_tau):
 @app.local_entrypoint()
 def main():
     search_space = [
-        #1, 2, 
-        3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
+        1, 2, 4, 5, 8, 9, 10, 14, 15, 16, 19, 20, 21, 25, 26, 30, 31
     ]
     print(f"Dispatching {len(search_space)} jobs to Modal...")
     futures = [evaluate_hyperparams.spawn(params) for params in search_space]
