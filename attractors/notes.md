@@ -45,3 +45,7 @@ hippo с объяснением про ортогональные функции
 [Brunton, Proctor, Kutz. 2015] Discovering governing equations from data: Sparse identification of nonlinear dynamical systems
 https://arxiv.org/pdf/1509.03580
 
+
+# чаты
+Как считать MACD
+
