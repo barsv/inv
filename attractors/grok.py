@@ -32,38 +32,57 @@ class HullMovingAverage(bt.Indicator):
 # Define the strategy
 class HMACrossoverStrategy(bt.Strategy):
     params = (
-        ('fast_period', 20),   # Increased Fast HMA period
-        ('slow_period', 50),   # Increased Slow HMA period
-        ('trend_period', 200), # Long-term trend HMA
-        ('rsi_period', 14),    # RSI period
-        ('rsi_overbought', 60),  # Tightened RSI overbought level
-        ('rsi_oversold', 40),    # Tightened RSI oversold level
-        ('crossover_threshold', 0.00005),  # 0.5% threshold for HMA crossover
-        ('stop_loss', 0.01),     # 1% stop-loss
-        ('take_profit', 0.02),   # 2% take-profit
+        ('fast_period', 20),
+        ('slow_period', 50),
+        ('trend_period', 200),
+        ('rsi_period', 14),
+        ('rsi_overbought', 60),
+        ('rsi_oversold', 40),
+        ('crossover_threshold', 0.00005),
+        ('stop_loss', 0.01),
+        ('take_profit', 0.03),
     )
 
     def __init__(self):
-        # Define the fast, slow, and trend HMAs
         self.fast_hma = HullMovingAverage(self.data.close, period=self.params.fast_period)
         self.slow_hma = HullMovingAverage(self.data.close, period=self.params.slow_period)
         self.trend_hma = HullMovingAverage(self.data.close, period=self.params.trend_period)
         self.crossover = bt.indicators.CrossOver(self.fast_hma, self.slow_hma)
-        
-        # Add RSI for confirmation
         self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
-
-        # Track entry price for stop-loss/take-profit
         self.entry_price = None
 
-    def next(self):
-        # Calculate the percentage difference between fast and slow HMA
-        hma_diff = (self.fast_hma[0] - self.slow_hma[0]) / self.slow_hma[0]
+    def log(self, txt):
+        dt = self.datas[0].datetime.datetime(0)
+        print(f'{dt}: {txt}')
 
-        # Determine the trend direction (based on price vs. trend HMA)
+    def notify_order(self, order):
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                self.log(f'BUY EXECUTED at {order.executed.price}')
+            elif order.issell():
+                self.log(f'SELL EXECUTED at {order.executed.price}')
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log(f'Order {order.status}')
+
+    def next(self):
+        hma_diff = (self.fast_hma[0] - self.slow_hma[0]) / self.slow_hma[0]
         trend_up = self.data.close[0] > self.trend_hma[0]
 
-        # Buy signal: Fast HMA crosses above Slow HMA, significant difference, RSI not overbought, and in an uptrend
+        # Check if we need to close the position due to stop-loss or take-profit
+        if self.position:
+            current_price = self.data.close[0]
+            if self.entry_price:
+                price_change = (current_price - self.entry_price) / self.entry_price
+                if price_change <= -self.params.stop_loss:
+                    self.log(f'Stop-Loss triggered at {current_price}')
+                    self.close()
+                    self.entry_price = None
+                elif price_change >= self.params.take_profit:
+                    self.log(f'Take-Profit triggered at {current_price}')
+                    self.close()
+                    self.entry_price = None
+
+        # Buy signal
         if (self.crossover > 0 and 
             hma_diff > self.params.crossover_threshold and 
             self.rsi < self.params.rsi_overbought and 
@@ -71,20 +90,19 @@ class HMACrossoverStrategy(bt.Strategy):
             if not self.position:
                 self.entry_price = self.data.close[0]
                 self.buy()
-                # Set stop-loss and take-profit
-                self.sell(exectype=bt.Order.Stop, price=self.entry_price * (1 - self.params.stop_loss))
-                self.sell(exectype=bt.Order.Limit, price=self.entry_price * (1 + self.params.take_profit))
+                self.log(f'BUY at {self.entry_price}')
 
-        # Sell signal: Fast HMA crosses below Slow HMA, significant difference, RSI not oversold, and in a downtrend
+        # Sell signal
         elif (self.crossover < 0 and 
               hma_diff < -self.params.crossover_threshold and 
               self.rsi > self.params.rsi_oversold and 
               not trend_up):
             if self.position:
-                self.entry_price = None
                 self.sell()
-                
+                self.log(f'SELL at {self.data.close[0]}')
+                self.entry_price = None
 
+# Set up the backtest
 # Set up the backtest
 cerebro = bt.Cerebro()
 cerebro.addstrategy(HMACrossoverStrategy)
@@ -94,13 +112,18 @@ data = bt.feeds.PandasData(dataname=df)
 cerebro.adddata(data)
 
 # Set initial cash and commission
-cerebro.broker.setcash(10000.0)  # Starting capital: $10,000
-cerebro.broker.setcommission(commission=0.0005)  # 0.05% commission per trade (more realistic for stocks)
+cerebro.broker.setcash(100000.0)
+cerebro.broker.setcommission(commission=0.0035 / 100)
 
-# Set position sizing: Risk $100 per trade
-cerebro.addsizer(bt.sizers.FixedSize, stake=1000 // df['Close'].mean())  # $1,000 worth of MSFT per trade
+# Set position sizing: Risk $1,000 per trade
+average_price = df['Close'].mean()
+stake = int(10000 / average_price)  # Number of shares for $1,000
+cerebro.addsizer(bt.sizers.FixedSize, stake=100)
 
-# Add analyzers to track performance
+# Enable margin checks to prevent negative balance
+cerebro.broker.set_checksubmit(True)
+
+# Add analyzers
 cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
 cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
