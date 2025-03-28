@@ -39,8 +39,7 @@ class HMACrossoverStrategy(bt.Strategy):
         ('rsi_overbought', 60),
         ('rsi_oversold', 40),
         ('crossover_threshold', 0.00005),
-        ('stop_loss', 0.01),
-        ('take_profit', 0.03),
+        ('trailing_stop', 0.01),  # 1% trailing stop
     )
 
     def __init__(self):
@@ -50,6 +49,7 @@ class HMACrossoverStrategy(bt.Strategy):
         self.crossover = bt.indicators.CrossOver(self.fast_hma, self.slow_hma)
         self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
         self.entry_price = None
+        self.highest_price = None  # Track the highest price for trailing stop
 
     def log(self, txt):
         dt = self.datas[0].datetime.datetime(0)
@@ -68,19 +68,21 @@ class HMACrossoverStrategy(bt.Strategy):
         hma_diff = (self.fast_hma[0] - self.slow_hma[0]) / self.slow_hma[0]
         trend_up = self.data.close[0] > self.trend_hma[0]
 
-        # Check if we need to close the position due to stop-loss or take-profit
+        # Check trailing stop-loss
         if self.position:
             current_price = self.data.close[0]
             if self.entry_price:
-                price_change = (current_price - self.entry_price) / self.entry_price
-                if price_change <= -self.params.stop_loss:
-                    self.log(f'Stop-Loss triggered at {current_price}')
+                # Update the highest price seen since entry
+                if current_price > self.highest_price:
+                    self.highest_price = current_price
+                # Calculate the trailing stop price (1% below the highest price)
+                trailing_stop_price = self.highest_price * (1 - self.params.trailing_stop)
+                # If the current price falls below the trailing stop, close the position
+                if current_price <= trailing_stop_price:
+                    self.log(f'Trailing Stop triggered at {current_price} (Highest: {self.highest_price})')
                     self.close()
                     self.entry_price = None
-                elif price_change >= self.params.take_profit:
-                    self.log(f'Take-Profit triggered at {current_price}')
-                    self.close()
-                    self.entry_price = None
+                    self.highest_price = None
 
         # Buy signal
         if (self.crossover > 0 and 
@@ -89,6 +91,7 @@ class HMACrossoverStrategy(bt.Strategy):
             trend_up):
             if not self.position:
                 self.entry_price = self.data.close[0]
+                self.highest_price = self.entry_price  # Initialize highest price
                 self.buy()
                 self.log(f'BUY at {self.entry_price}')
 
@@ -101,8 +104,8 @@ class HMACrossoverStrategy(bt.Strategy):
                 self.sell()
                 self.log(f'SELL at {self.data.close[0]}')
                 self.entry_price = None
+                self.highest_price = None
 
-# Set up the backtest
 # Set up the backtest
 cerebro = bt.Cerebro()
 cerebro.addstrategy(HMACrossoverStrategy)
@@ -111,16 +114,31 @@ cerebro.addstrategy(HMACrossoverStrategy)
 data = bt.feeds.PandasData(dataname=df)
 cerebro.adddata(data)
 
-# Set initial cash and commission
-cerebro.broker.setcash(100000.0)
-cerebro.broker.setcommission(commission=0.0035 / 100)
+# Set initial cash
+cerebro.broker.setcash(100000.0)  # Starting capital: $100,000
 
-# Set position sizing: Risk $1,000 per trade
-average_price = df['Close'].mean()
-stake = int(10000 / average_price)  # Number of shares for $1,000
+# Set IBKR commission: $0.0035 per share, minimum $0.35 per trade
+class IBKRCommission(bt.CommInfoBase):
+    params = (
+        ('commission', 0.0035),  # $0.0035 per share
+        ('min_commission', 0.35),  # Minimum $0.35 per trade
+        ('stocklike', True),
+        ('commtype', bt.CommInfoBase.COMM_FIXED),
+    )
+
+    def _getcommission(self, size, price, pseudoexec):
+        comm = abs(size) * self.p.commission
+        return max(comm, self.p.min_commission)
+
+# Apply the custom commission scheme
+#cerebro.broker.setcommission(commission=0.0035, commtype=bt.CommInfoBase.COMM_FIXED, stocklike=True)
+#cerebro.addcommissioninfo(IBKRCommission())
+cerebro.broker.addcommissioninfo(IBKRCommission())
+
+# Set position sizing: 100 shares per trade
 cerebro.addsizer(bt.sizers.FixedSize, stake=100)
 
-# Enable margin checks to prevent negative balance
+# Enable margin checks
 cerebro.broker.set_checksubmit(True)
 
 # Add analyzers
