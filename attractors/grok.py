@@ -2,11 +2,16 @@ import backtrader as bt
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
-# Load the data
+# Get the absolute path to the current script
+script_path = os.path.abspath(__file__)
+# Get the directory containing the script
+script_dir = os.path.dirname(script_path)
+relative_file_path = os.path.join(script_dir, '../csv/MSFT_M1_202402291729_202503272108.csv')
 
 # Load the data (tab-separated file)
-df = pd.read_csv('../csv/MSFT_M1_202402291729_202503272108.csv', sep='\t')  # Use tab as the separator
+df = pd.read_csv(relative_file_path, sep='\t')  # Use tab as the separator
 df['Datetime'] = pd.to_datetime(df['<DATE>'] + ' ' + df['<TIME>'])  # Use the correct column names
 df.set_index('Datetime', inplace=True)
 df.drop(columns=['<DATE>', '<TIME>'], inplace=True)  # Drop the original columns
@@ -39,7 +44,10 @@ class HMACrossoverStrategy(bt.Strategy):
         ('rsi_overbought', 60),
         ('rsi_oversold', 40),
         ('crossover_threshold', 0.00005),
-        ('trailing_stop', 0.01),  # 1% trailing stop
+        ('trailing_stop', 0.01),
+        ('no_trade_hour', 19),  # Stop opening trades in the evening
+        ('close_trade_hour', 19),  # Start closing trades before market close
+        ('close_trade_minute', 30),
     )
 
     def __init__(self):
@@ -49,7 +57,9 @@ class HMACrossoverStrategy(bt.Strategy):
         self.crossover = bt.indicators.CrossOver(self.fast_hma, self.slow_hma)
         self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
         self.entry_price = None
-        self.highest_price = None  # Track the highest price for trailing stop
+        self.highest_price = None
+        self.total_turnover = 0.0
+        self.total_commissions = 0.0
 
     def log(self, txt):
         dt = self.datas[0].datetime.datetime(0)
@@ -57,10 +67,14 @@ class HMACrossoverStrategy(bt.Strategy):
 
     def notify_order(self, order):
         if order.status in [order.Completed]:
+            commission = order.executed.comm
+            self.total_commissions += commission
+            turnover = abs(order.executed.size) * order.executed.price
+            self.total_turnover += turnover
             if order.isbuy():
-                self.log(f'BUY EXECUTED at {order.executed.price}')
+                self.log(f'BUY EXECUTED at {order.executed.price}, Commission: ${commission:.2f}')
             elif order.issell():
-                self.log(f'SELL EXECUTED at {order.executed.price}')
+                self.log(f'SELL EXECUTED at {order.executed.price}, Commission: ${commission:.2f}')
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log(f'Order {order.status}')
 
@@ -68,16 +82,25 @@ class HMACrossoverStrategy(bt.Strategy):
         hma_diff = (self.fast_hma[0] - self.slow_hma[0]) / self.slow_hma[0]
         trend_up = self.data.close[0] > self.trend_hma[0]
 
+        # Get the current time (in UTC)
+        current_time = self.datas[0].datetime.datetime(0)
+        current_hour = current_time.hour
+        current_minute = current_time.minute
+
+        # Close open positions if market closes
+        if self.position and current_hour >= self.params.close_trade_hour and current_minute >= self.params.close_trade_minute:
+            self.log(f'Closing position due to time restriction')
+            self.close()
+            self.entry_price = None
+            self.highest_price = None
+
         # Check trailing stop-loss
         if self.position:
             current_price = self.data.close[0]
             if self.entry_price:
-                # Update the highest price seen since entry
                 if current_price > self.highest_price:
                     self.highest_price = current_price
-                # Calculate the trailing stop price (1% below the highest price)
                 trailing_stop_price = self.highest_price * (1 - self.params.trailing_stop)
-                # If the current price falls below the trailing stop, close the position
                 if current_price <= trailing_stop_price:
                     self.log(f'Trailing Stop triggered at {current_price} (Highest: {self.highest_price})')
                     self.close()
@@ -90,21 +113,27 @@ class HMACrossoverStrategy(bt.Strategy):
             self.rsi < self.params.rsi_overbought and 
             trend_up):
             if not self.position:
-                self.entry_price = self.data.close[0]
-                self.highest_price = self.entry_price  # Initialize highest price
-                self.buy()
-                self.log(f'BUY at {self.entry_price}')
+                # don't open orders in the evening before the market closes
+                if current_hour < self.params.no_trade_hour:
+                        self.entry_price = self.data.close[0]
+                        self.highest_price = self.entry_price
+                        self.buy()
+                        self.log(f'BUY at {self.entry_price}')
 
         # Sell signal
         elif (self.crossover < 0 and 
-              hma_diff < -self.params.crossover_threshold and 
-              self.rsi > self.params.rsi_oversold and 
-              not trend_up):
+                hma_diff < -self.params.crossover_threshold and 
+                self.rsi > self.params.rsi_oversold and 
+                not trend_up):
             if self.position:
                 self.sell()
                 self.log(f'SELL at {self.data.close[0]}')
                 self.entry_price = None
                 self.highest_price = None
+
+    def stop(self):
+        self.log(f'Total Turnover: ${self.total_turnover:.2f}')
+        self.log(f'Total Commissions Paid: ${self.total_commissions:.2f}')
 
 # Set up the backtest
 cerebro = bt.Cerebro()
@@ -161,6 +190,8 @@ print(f"Max Drawdown: {drawdown['max']['drawdown']:.2f}%")
 print(f"Total Trades: {trades['total']['total']}")
 print(f"Winning Trades: {trades['won']['total']}")
 print(f"Losing Trades: {trades['lost']['total']}")
+print(f"Total Turnover: ${results[0].total_turnover:.2f}")
+print(f"Total Commissions Paid: ${results[0].total_commissions:.2f}")
 
 # Plot the results
 cerebro.plot()
